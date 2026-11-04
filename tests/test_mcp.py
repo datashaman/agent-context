@@ -19,7 +19,7 @@ async def test_real_stdio_client(tmp_path):
         async with ClientSession(reader, writer) as client:
             await client.initialize()
             tools = {t.name: t for t in (await client.list_tools()).tools}
-            assert len(tools) == 9
+            assert len(tools) == 10
             assert tools["infer"].annotations.readOnlyHint
             assert tools["delete_record"].annotations.destructiveHint
             guide = await client.read_resource("context://guide")
@@ -29,7 +29,9 @@ async def test_real_stdio_client(tmp_path):
             assert not added.isError
             found = await client.call_tool("search_notes", {"space": "test", "query": "SQLite"})
             assert not found.isError and "SQLite chosen" in found.content[0].text
-            invalid = await client.call_tool("put_fact", {"space": "", "id": "f1",
+            listed = await client.call_tool("list_notes", {"space": "test"})
+            assert not listed.isError and '"n1"' in listed.content[0].text
+            invalid =await client.call_tool("put_fact", {"space": "", "id": "f1",
                 "subject": "a", "predicate": "p", "object": "b", "source": "s"})
             assert invalid.isError
             for id, subject, object in [("f1", "a", "b"), ("f2", "b", "c")]:
@@ -40,6 +42,8 @@ async def test_real_stdio_client(tmp_path):
                 "head": ["?x", "depends", "?z"], "body": [["?x", "depends", "?y"],
                 ["?y", "depends", "?z"]], "source": "policy"})
             assert not rule.isError
+            page = await client.call_tool("list_facts", {"space": "test", "limit": 1, "after": "f1"})
+            assert not page.isError and [f["id"] for f in page.structuredContent["result"]] == ["f2"]
             result = await client.call_tool("infer", {"space": "test", "subject": "a", "object": "c"})
             assert not result.isError
             assert result.structuredContent["total_matches"] == 1

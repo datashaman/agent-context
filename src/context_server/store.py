@@ -151,6 +151,17 @@ class Store:
                 ORDER BY bm25(notes_fts),n.id LIMIT ?""", (match, space, now(), limit)).fetchall()
         return [self.note(row) for row in rows]
 
+    def list_notes(self, space, after=None, limit=50):
+        text(space, "space")
+        limit_value(limit)
+        if after is not None:
+            text(after, "after")
+        with self.connect() as db:
+            rows = db.execute("""SELECT id,title,source,updated_at,expires_at FROM notes
+                WHERE space=? AND (expires_at IS NULL OR expires_at>?) AND id>?
+                ORDER BY id LIMIT ?""", (space, now(), after or "", limit)).fetchall()
+        return [dict(row) for row in rows]
+
     def put_fact(self, space, id, subject, predicate, object, source, expires_at=None):
         for name, value in [("space", space), ("id", id), ("subject", subject),
                             ("predicate", predicate), ("object", object), ("source", source)]:
@@ -163,11 +174,13 @@ class Store:
                 (space, id, subject, predicate, object, source, now(), expiry(expires_at)))
         return {"id": id, "space": space}
 
-    def list_facts(self, space, subject=None, predicate=None, object=None, limit=50):
+    def list_facts(self, space, subject=None, predicate=None, object=None, limit=50, after=None):
         text(space, "space")
         limit_value(limit)
-        clauses = ["space=?", "(expires_at IS NULL OR expires_at>?)"]
-        args = [space, now()]
+        clauses = ["space=?", "(expires_at IS NULL OR expires_at>?)", "id>?"]
+        args = [space, now(), after or ""]
+        if after is not None:
+            text(after, "after")
         for name, value in [("subject", subject), ("predicate", predicate), ("object", object)]:
             if value is not None:
                 text(value, name)

@@ -28,6 +28,70 @@ def test_notes_persist_update_expire_and_isolate(store):
     assert store.get_note("b", "decision") is not None
 
 
+def ids(records):
+    return [r["id"] for r in records]
+
+
+def walk(page):
+    """Follow the after cursor until a short page; return every id seen."""
+    seen, after = [], None
+    while True:
+        batch = ids(page(after))
+        seen += batch
+        if len(batch) < 100:
+            return seen
+        after = batch[-1]
+
+
+def test_list_notes_browses_without_keyword(store):
+    store.put_note("a", "zeta", "Z title", "z body", "s", {"tag": "x"})
+    store.put_note("a", "alpha", "A title", "a body", "s")
+    store.put_note("a", "old", "Old", "gone", "s", expires_at="2000-01-01T00:00:00Z")
+    store.put_note("b", "beta", "B", "b", "s")
+    listed = store.list_notes("a")
+    assert ids(listed) == ["alpha", "zeta"]  # ID order, expired hidden, space isolated
+    assert set(listed[0]) == {"id", "title", "source", "updated_at", "expires_at"}
+    assert ids(store.list_notes("a", limit=1)) == ["alpha"]
+    assert ids(store.list_notes("a", after="alpha")) == ["zeta"]
+    assert store.list_notes("a", after="zeta") == []
+    assert store.list_notes("empty") == []
+    store.delete("a", "note", "alpha")
+    assert ids(store.list_notes("a")) == ["zeta"]
+
+
+def test_cursor_walks_every_record_past_page_cap(store):
+    for i in range(250):
+        store.put_note("a", f"n{i:03}", "t", "c", "s")
+        store.put_fact("a", f"f{i:03}", "x" if i % 2 else "y", "p", "o", "s")
+    assert walk(lambda after: store.list_notes("a", after=after, limit=100)) == [f"n{i:03}" for i in range(250)]
+    assert walk(lambda after: store.list_facts("a", after=after, limit=100)) == [f"f{i:03}" for i in range(250)]
+    odd = walk(lambda after: store.list_facts("a", subject="x", after=after, limit=100))
+    assert odd == [f"f{i:03}" for i in range(1, 250, 2)]
+
+
+def test_list_facts_paging_hides_expired_and_other_spaces(store):
+    store.put_fact("a", "f1", "x", "p", "o", "s")
+    store.put_fact("a", "f2", "x", "p", "o", "s", expires_at="2000-01-01T00:00:00Z")
+    store.put_fact("a", "f3", "x", "p", "o", "s")
+    store.put_fact("b", "f2b", "x", "p", "o", "s")
+    assert ids(store.list_facts("a", after="f1")) == ["f3"]
+    assert store.list_facts("a", after="f3") == []
+
+
+@pytest.mark.parametrize("call", [
+    lambda s: s.list_notes("a", limit=0),
+    lambda s: s.list_notes("a", limit=101),
+    lambda s: s.list_notes("a", after=""),
+    lambda s: s.list_notes("a", after="x\x00"),
+    lambda s: s.list_notes(""),
+    lambda s: s.list_facts("a", after="   "),
+    lambda s: s.list_facts("a", after="x" * 513),
+])
+def test_listing_rejects_bad_arguments(store, call):
+    with pytest.raises(ValueError):
+        call(store)
+
+
 def transitive(store, space="a"):
     store.put_rule(space, "transitive", ["?x", "depends", "?z"],
                    [["?x", "depends", "?y"], ["?y", "depends", "?z"]], "policy:dependencies")

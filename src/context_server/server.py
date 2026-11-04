@@ -29,8 +29,9 @@ def create_server(path: str | Path) -> FastMCP:
             "An optional ISO-8601 expires_at must include timezone; expired notes/facts are hidden from reads "
             "and inference, not physically deleted. delete_record permanently removes one record. "
             "Search matches literal words with OR semantics and ranks using SQLite FTS5. "
-            "Fact queries match exact terms. list_facts and search_notes return at most limit items; "
-            "a full page may mean there are more results. "
+            "Fact queries match exact terms. list_notes browses note IDs and titles without needing a keyword; "
+            "page list_notes and list_facts by passing the last id as after. list_facts, list_notes and search_notes return at most "
+            "limit items; a full page may mean there are more results. "
             "Rules use [subject,predicate,object] patterns; ?x names a variable. All body patterns must hold. "
             "No negation, functions, executable code, optimization, or raw ASP. Inference returns the positive "
             "closure, including asserted facts. Derived results are computed, never saved as assertions. "
@@ -60,6 +61,12 @@ def create_server(path: str | Path) -> FastMCP:
         """Find active notes by literal words, ranked by relevance. limit is 1–100."""
         return store.search_notes(space, query, limit)
 
+    @mcp.tool(annotations=read)
+    def list_notes(space: str, after: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        """Browse active notes in ID order: id, title, source, timestamps (no content; use get_note).
+        To page, pass the last returned id as after. limit 1–100."""
+        return store.list_notes(space, after, limit)
+
     @mcp.tool(annotations=write)
     def put_fact(space: str, id: str, subject: str, predicate: str, object: str,
                  source: str, expires_at: str | None = None) -> dict[str, Any]:
@@ -68,9 +75,10 @@ def create_server(path: str | Path) -> FastMCP:
 
     @mcp.tool(annotations=read)
     def list_facts(space: str, subject: str | None = None, predicate: str | None = None,
-                   object: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
-        """Read active asserted facts with optional exact filters. Does not run inference. limit 1–100."""
-        return store.list_facts(space, subject, predicate, object, limit)
+                   object: str | None = None, limit: int = 50, after: str | None = None) -> list[dict[str, Any]]:
+        """Read active asserted facts in ID order with optional exact filters. Does not run inference.
+        To page, pass the last returned id as after. limit 1–100."""
+        return store.list_facts(space, subject, predicate, object, limit, after)
 
     @mcp.tool(annotations=write)
     def put_rule(space: str, id: str, head: list[str], body: list[list[str]], source: str) -> dict[str, Any]:
