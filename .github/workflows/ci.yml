@@ -12,13 +12,10 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.3
-      - run: uv sync --no-editable --locked --python ${{ matrix.python }}
+      - run: uv sync --no-editable --locked --python 3.13
       - run: uv run --no-editable --locked coverage run -m pytest -q
       - run: uv run --no-editable --locked coverage report
       - run: uv build

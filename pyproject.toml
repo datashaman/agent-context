@@ -2,7 +2,7 @@
 name = "agent-context-server"
 version = "0.1.0"
 description = "Local MCP context memory with SQLite and clingo inference"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = ["mcp>=1.26,<2", "clingo>=5.8,<6"]
 
 [project.scripts]
