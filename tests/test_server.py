@@ -77,15 +77,16 @@ def test_main_uses_context_db_env_over_stdio(monkeypatch, tmp_path):
     monkeypatch.setenv("CONTEXT_DB", str(tmp_path / "env.db"))
     monkeypatch.setattr(server, "create_server", FakeServer)
     server.main()
-    assert (FakeServer.last.path, FakeServer.last.transport) == (str(tmp_path / "env.db"), "stdio")
+    assert (FakeServer.last.path, FakeServer.last.transport) == (tmp_path / "env.db", "stdio")
 
 
-def test_main_defaults_to_cwd(monkeypatch, tmp_path):
+def test_default_database_is_shared_per_user(monkeypatch, tmp_path):
     monkeypatch.delenv("CONTEXT_DB", raising=False)
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(server, "create_server", FakeServer)
-    server.main()
-    assert FakeServer.last.path == str(tmp_path / "context.db")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    assert server.db_path() == tmp_path / "data" / "agent-context" / "context.db"
+    monkeypatch.delenv("XDG_DATA_HOME")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert server.db_path() == tmp_path / ".local" / "share" / "agent-context" / "context.db"
 
 
 def fact(s, p, o):

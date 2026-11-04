@@ -1,6 +1,6 @@
 # Agent Context Server
 
-A local, persistent MCP memory server for agents. Store sourced notes and relationship facts, search notes, and derive new facts using clingo. No API key, model provider, external database, or network service required at runtime.
+A local, persistent memory for agents, usable as an agent skill or an MCP server. Store sourced notes and relationship facts, search notes, and derive new facts using clingo. No API key, model provider, external database, or network service required at runtime.
 
 This is a small working foundation, not a hosted multi-tenant service. It uses SQLite FTS5 for text retrieval and clingo for **positive rule inference**, not arbitrary ASP planning. Notes and rules are explicit: no automatic extraction from documents or silent promotion of model guesses into facts.
 
@@ -15,9 +15,23 @@ uv run --no-editable --locked context-server
 
 The server speaks MCP over stdin/stdout and waits for a client. It is not an interactive terminal application. Diagnostics go to stderr. Requires Python 3.13 or newer.
 
-By default data goes to `context.db` in the process working directory. Set `CONTEXT_DB` to an absolute path for stable storage across clients and restarts.
+Data goes to one shared per-user database, `~/.local/share/agent-context/context.db` (or under `$XDG_DATA_HOME`), so every client and working directory sees the same records. Set `CONTEXT_DB` to use a different file.
+
+## Use as a skill (Claude Code, Codex and other shell-capable agents)
+
+Install the commands onto your PATH, then write the skill into your agent's skills directory:
+
+```sh
+uv tool install --python 3.13 /absolute/path/to/agent-context
+agent-context install-skill                      # writes ~/.claude/skills/agent-context/SKILL.md
+agent-context install-skill --dir <skills-dir>   # any other agent's skills directory
+```
+
+The skill teaches the agent the workflow and the rules below, and the agent calls `agent-context <tool> --flag value ...`. Commands and flags are generated from the MCP tool definitions, so the two always match; `agent-context <tool> --help` lists a tool's flags. Output is JSON; errors go to stderr with exit status 1. Re-run `uv tool install --reinstall ...` and `install-skill` after updating the checkout.
 
 ## Connect an MCP client
+
+Use this for clients that cannot run shell commands, such as Claude Desktop.
 
 Copy the included [`mcp-config.json`](mcp-config.json) into a client that accepts the common `mcpServers` JSON format, and replace its three placeholder paths:
 
