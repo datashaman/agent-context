@@ -16,14 +16,15 @@ build-backend = "hatchling.build"
 packages = ["src/context_server"]
 
 [tool.uv]
+# Installs are non-editable (--no-editable) so a running server and the reasoner subprocess it
+# spawns per infer() always use the same code, even while the checkout is being edited.
+# cache-keys make uv rebuild that install whenever the source changes.
 cache-keys = [{file = "pyproject.toml"}, {file = "src/**/*.py"}]
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "coverage>=7,<8"]
+dev = ["pytest>=8,<10", "coverage>=7,<8"]  # async tests use the anyio plugin that ships with mcp
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
 [tool.coverage.run]
@@ -31,5 +32,4 @@ source = ["context_server"]
 
 [tool.coverage.report]
 show_missing = true
-# Leaves room for the reasoner's unreachable "no model" branch and the __main__ guard.
-fail_under = 95
+fail_under = 100

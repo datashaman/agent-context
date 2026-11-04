@@ -4,12 +4,10 @@ import sys
 
 import clingo
 
-from .store import validate_rule
-
 
 def solve(payload):
     facts, rules = payload["facts"], payload["rules"]
-    definitions = [validate_rule(**json.loads(r["definition"])) for r in rules]
+    definitions = [json.loads(r["definition"]) for r in rules]  # validated by put_rule
     constants = {f[k] for f in facts for k in ("subject", "predicate", "object")}
     constants.update(t for r in definitions for triple in [r["head"], *r["body"]]
                      for t in triple if not t.startswith("?"))
@@ -36,13 +34,11 @@ def solve(payload):
     control = clingo.Control(["--warn=none", "--models=1"])
     control.add("base", [], "\n".join(program))
     control.ground([("base", [])])
-    with control.solve(yield_=True) as handle:
-        for model in handle:
-            symbols = model.symbols(shown=True)
-            if len(symbols) > 10_000:
-                raise ValueError("inference exceeded 10000 results; narrow the rules")
-            return sorted([[reverse[str(a)] for a in symbol.arguments] for symbol in symbols])
-    raise ValueError("no model found")
+    symbols = []  # a positive program has exactly one model
+    control.solve(on_model=lambda model: symbols.extend(model.symbols(shown=True)))
+    if len(symbols) > 10_000:
+        raise ValueError("inference exceeded 10000 results; narrow the rules")
+    return sorted([[reverse[str(a)] for a in symbol.arguments] for symbol in symbols])
 
 
 if __name__ == "__main__":
