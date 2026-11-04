@@ -19,9 +19,17 @@ packages = ["src/context_server"]
 cache-keys = [{file = "pyproject.toml"}, {file = "src/**/*.py"}]
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2"]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "coverage>=7,<8"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["context_server"]
+
+[tool.coverage.report]
+show_missing = true
+# Leaves room for the reasoner's unreachable "no model" branch and the __main__ guard.
+fail_under = 95

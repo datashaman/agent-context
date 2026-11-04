@@ -115,6 +115,15 @@ uv run --no-editable --locked pytest -q
 uv build
 ```
 
+Coverage (CI fails below 95%):
+
+```sh
+uv run --no-editable --locked coverage run -m pytest -q
+uv run --no-editable --locked coverage report
+```
+
+CI runs the tests with coverage, then the build, on Python 3.11 and 3.12 for every pull request and every push to `main`.
+
 Tests cover storage persistence, search-index updates, expiry, source retention, workspace scoping, rule validation, cycles, changed/retracted evidence, hostile strings, domain limits, and a real stdio MCP handshake and tool calls.
 
 ## References
