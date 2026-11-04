@@ -43,6 +43,23 @@ def walk(page):
         after = batch[-1]
 
 
+def test_list_spaces_counts_active_records(store):
+    assert store.list_spaces() == []
+    store.put_note("zeta", "n1", "t", "c", "s")
+    store.put_note("zeta", "n2", "t", "c", "s")
+    store.put_fact("alpha", "f1", "a", "p", "b", "s")
+    transitive(store, "alpha")
+    store.put_note("gone", "old", "t", "c", "s", expires_at="2000-01-01T00:00:00Z")
+    store.put_fact("zeta", "old", "a", "p", "b", "s", expires_at="2000-01-01T00:00:00Z")
+    assert store.list_spaces() == [  # name order; expired records neither counted nor listed
+        {"space": "alpha", "notes": 0, "facts": 1, "rules": 1},
+        {"space": "zeta", "notes": 2, "facts": 0, "rules": 0},
+    ]
+    store.delete("alpha", "fact", "f1")
+    store.delete("alpha", "rule", "transitive")
+    assert [s["space"] for s in store.list_spaces()] == ["zeta"]
+
+
 def test_list_notes_browses_without_keyword(store):
     store.put_note("a", "zeta", "Z title", "z body", "s", {"tag": "x"})
     store.put_note("a", "alpha", "A title", "a body", "s")

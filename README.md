@@ -46,6 +46,7 @@ Tell your agent:
 | `put_note` | Create or replace prose, with source, optional JSON metadata and expiry |
 | `get_note` | Retrieve an active note by stable ID |
 | `search_notes` | Ranked full-text search over active note title/content |
+| `list_spaces` | List spaces holding active records, with note/fact/rule counts |
 | `list_notes` | Browse active notes (ID, title, source, timestamps) in ID order, paged with `after` |
 | `put_fact` | Create or replace a sourced subject/predicate/object assertion |
 | `list_facts` | Retrieve active assertions with optional exact filters, in ID order, paged with `after` |
@@ -54,7 +55,7 @@ Tell your agent:
 | `infer` | Compute asserted and derived triples from a consistent snapshot |
 | `delete_record` | Permanently delete one note, fact, or rule |
 
-Every tool requires an explicit `space`. IDs are unique within a space and record kind. Writing an existing ID replaces that record; use a new ID to retain another independent assertion. No automatic entity merging: `service:checkout` and `Checkout` are different terms. Strings starting `?` are reserved for variables in rules.
+Every tool except `list_spaces` requires an explicit `space`. IDs are unique within a space and record kind. Writing an existing ID replaces that record; use a new ID to retain another independent assertion. No automatic entity merging: `service:checkout` and `Checkout` are different terms. Strings starting `?` are reserved for variables in rules.
 
 `source` is a required nonblank label or URI. It is not fetched or verified. Notes support metadata for confidence, author, observed date, tags, etc.; metadata is not searched. Facts retain source and write timestamp; confidence propagation is not implemented. Conflicting assertions coexist.
 

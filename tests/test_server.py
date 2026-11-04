@@ -23,10 +23,10 @@ async def call(mcp, name, **args):
 
 async def test_every_tool_round_trips(mcp):
     tools = {t.name: t for t in await mcp.list_tools()}
-    assert set(tools) == {"put_note", "get_note", "search_notes", "list_notes", "put_fact", "list_facts",
+    assert set(tools) == {"put_note", "get_note", "search_notes", "list_notes", "list_spaces", "put_fact", "list_facts",
                           "put_rule", "list_rules", "infer", "delete_record"}
     read_only = {n for n, t in tools.items() if t.annotations.readOnlyHint}
-    assert read_only == {"get_note", "search_notes", "list_notes", "list_facts", "list_rules", "infer"}
+    assert read_only == {"get_note", "search_notes", "list_notes", "list_spaces", "list_facts", "list_rules", "infer"}
 
     await call(mcp, "put_note", space="s", id="n1", title="DB", content="Use SQLite", source="m",
                metadata={"by": "Sam"}, expires_at="2099-01-01T00:00:00Z")
@@ -34,6 +34,7 @@ async def test_every_tool_round_trips(mcp):
     assert note["metadata"] == {"by": "Sam"} and note["expires_at"].startswith("2099-01-01")
     assert [n["id"] for n in await call(mcp, "search_notes", space="s", query="sqlite")] == ["n1"]
     assert [n["id"] for n in await call(mcp, "list_notes", space="s")] == ["n1"]
+    assert await call(mcp, "list_spaces") == [{"space": "s", "notes": 1, "facts": 0, "rules": 0}]
 
     for id, subject, obj in [("f1", "a", "b"), ("f2", "b", "c")]:
         await call(mcp, "put_fact", space="s", id=id, subject=subject, predicate="dep", object=obj, source="r")
@@ -57,7 +58,7 @@ async def test_tool_errors_surface(mcp):
 
 async def test_guide_resource_states_trust_rules(mcp):
     [content] = await mcp.read_resource("context://guide")
-    for phrase in ("untrusted", "list_notes", "after", "unknown"):
+    for phrase in ("untrusted", "list_spaces", "list_notes", "after", "unknown"):
         assert phrase in content.content
 
 
