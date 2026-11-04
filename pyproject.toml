@@ -7,6 +7,7 @@ dependencies = ["mcp>=1.26,<2", "clingo>=5.8,<6"]
 
 [project.scripts]
 context-server = "context_server.server:main"
+agent-context = "context_server.cli:main"
 
 [build-system]
 requires = ["hatchling"]
