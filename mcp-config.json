@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "context": {
+      "command": "/absolute/path/to/uv",
+      "args": [
+        "run", "--no-editable", "--locked", "--directory",
+        "/absolute/path/to/agent-context",
+        "context-server"
+      ],
+      "env": {
+        "CONTEXT_DB": "/absolute/path/to/context.db"
+      }
+    }
+  }
+}
