@@ -151,6 +151,17 @@ class Store:
                 ORDER BY bm25(notes_fts),n.id LIMIT ?""", (match, space, now(), limit)).fetchall()
         return [self.note(row) for row in rows]
 
+    def list_spaces(self):
+        # ponytail: unpaged; add an after cursor if spaces ever number in the hundreds.
+        with self.connect() as db:
+            t = now()
+            rows = db.execute("""SELECT space, SUM(n) AS notes, SUM(f) AS facts, SUM(r) AS rules FROM (
+                SELECT space, 1 n, 0 f, 0 r FROM notes WHERE expires_at IS NULL OR expires_at>?
+                UNION ALL SELECT space, 0, 1, 0 FROM facts WHERE expires_at IS NULL OR expires_at>?
+                UNION ALL SELECT space, 0, 0, 1 FROM rules
+                ) GROUP BY space ORDER BY space""", (t, t)).fetchall()
+        return [dict(row) for row in rows]
+
     def list_notes(self, space, after=None, limit=50):
         text(space, "space")
         limit_value(limit)

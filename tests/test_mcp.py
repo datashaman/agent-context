@@ -19,7 +19,7 @@ async def test_real_stdio_client(tmp_path):
         async with ClientSession(reader, writer) as client:
             await client.initialize()
             tools = {t.name: t for t in (await client.list_tools()).tools}
-            assert len(tools) == 10
+            assert len(tools) == 11
             assert tools["infer"].annotations.readOnlyHint
             assert tools["delete_record"].annotations.destructiveHint
             guide = await client.read_resource("context://guide")
@@ -31,7 +31,10 @@ async def test_real_stdio_client(tmp_path):
             assert not found.isError and "SQLite chosen" in found.content[0].text
             listed = await client.call_tool("list_notes", {"space": "test"})
             assert not listed.isError and '"n1"' in listed.content[0].text
-            invalid =await client.call_tool("put_fact", {"space": "", "id": "f1",
+            spaces = await client.call_tool("list_spaces", {})
+            assert not spaces.isError and spaces.structuredContent["result"] == [
+                {"space": "test", "notes": 1, "facts": 0, "rules": 0}]
+            invalid = await client.call_tool("put_fact", {"space": "", "id": "f1",
                 "subject": "a", "predicate": "p", "object": "b", "source": "s"})
             assert invalid.isError
             for id, subject, object in [("f1", "a", "b"), ("f2", "b", "c")]:

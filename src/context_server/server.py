@@ -29,7 +29,7 @@ def create_server(path: str | Path) -> FastMCP:
             "An optional ISO-8601 expires_at must include timezone; expired notes/facts are hidden from reads "
             "and inference, not physically deleted. delete_record permanently removes one record. "
             "Search matches literal words with OR semantics and ranks using SQLite FTS5. "
-            "Fact queries match exact terms. list_notes browses note IDs and titles without needing a keyword; "
+            "list_spaces shows which spaces hold active records. Fact queries match exact terms. list_notes browses note IDs and titles without needing a keyword; "
             "page list_notes and list_facts by passing the last id as after. list_facts, list_notes and search_notes return at most "
             "limit items; a full page may mean there are more results. "
             "Rules use [subject,predicate,object] patterns; ?x names a variable. All body patterns must hold. "
@@ -60,6 +60,12 @@ def create_server(path: str | Path) -> FastMCP:
     def search_notes(space: str, query: str, limit: int = 10) -> list[dict[str, Any]]:
         """Find active notes by literal words, ranked by relevance. limit is 1–100."""
         return store.search_notes(space, query, limit)
+
+    @mcp.tool(annotations=read)
+    def list_spaces() -> list[dict[str, Any]]:
+        """List spaces that hold active records, with counts of active notes, facts and rules.
+        Spaces are labels, not access boundaries."""
+        return store.list_spaces()
 
     @mcp.tool(annotations=read)
     def list_notes(space: str, after: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
