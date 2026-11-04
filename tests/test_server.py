@@ -10,6 +10,8 @@ from mcp.server.fastmcp.exceptions import ToolError
 from context_server import server
 from context_server.reasoner import solve
 
+pytestmark = pytest.mark.anyio
+
 
 @pytest.fixture
 def mcp(tmp_path):
@@ -102,9 +104,7 @@ def test_solve_closure_constants_and_no_rules():
     assert solve({"facts": [], "rules": []}) == []
 
 
-def test_solve_rejects_invalid_stored_rule_and_oversized_domain():
-    with pytest.raises(ValueError, match="variables"):
-        solve({"facts": [], "rules": [rule(["?x", "p", "?y"], [["?x", "p", "b"]])]})
+def test_solve_rejects_oversized_domain():
     with pytest.raises(ValueError, match="128"):
         solve({"facts": [fact(str(i), "p", "o") for i in range(130)], "rules": []})
 

@@ -16,6 +16,13 @@ def text(value: str, name: str, maximum: int = 512) -> str:
     return value
 
 
+def texts(**fields: str | None) -> None:
+    """Validate each provided (non-None) field with text()."""
+    for name, value in fields.items():
+        if value is not None:
+            text(value, name)
+
+
 def expiry(value: str | None) -> str | None:
     if value is None:
         return None
@@ -51,6 +58,9 @@ def validate_rule(head: list[str], body: list[list[str]]) -> dict:
     if any(t.startswith("?") and t not in variables for t in head):
         raise ValueError("all head variables must occur in the body")
     return {"head": head, "body": body}
+
+
+ACTIVE = "(expires_at IS NULL OR expires_at>?)"
 
 
 class Store:
@@ -107,8 +117,7 @@ class Store:
             db.close()
 
     def put_note(self, space, id, title, content, source, metadata=None, expires_at=None):
-        for name, value in [("space", space), ("id", id), ("title", title), ("source", source)]:
-            text(value, name)
+        texts(space=space, id=id, title=title, source=source)
         text(content, "content", 100_000)
         if metadata is not None and not isinstance(metadata, dict):
             raise ValueError("metadata must be an object")
@@ -129,10 +138,9 @@ class Store:
         return item
 
     def get_note(self, space, id):
-        text(space, "space")
-        text(id, "id")
+        texts(space=space, id=id)
         with self.connect() as db:
-            row = db.execute("SELECT * FROM notes WHERE space=? AND id=? AND (expires_at IS NULL OR expires_at>?)",
+            row = db.execute(f"SELECT * FROM notes WHERE space=? AND id=? AND {ACTIVE}",
                              (space, id, now())).fetchone()
         return self.note(row) if row else None
 
@@ -146,8 +154,8 @@ class Store:
             return []
         match = " OR ".join('"' + t + '"' for t in tokens[:32])
         with self.connect() as db:
-            rows = db.execute("""SELECT n.* FROM notes_fts JOIN notes n ON n.rowid=notes_fts.rowid
-                WHERE notes_fts MATCH ? AND n.space=? AND (n.expires_at IS NULL OR n.expires_at>?)
+            rows = db.execute(f"""SELECT n.* FROM notes_fts JOIN notes n ON n.rowid=notes_fts.rowid
+                WHERE notes_fts MATCH ? AND n.space=? AND {ACTIVE}
                 ORDER BY bm25(notes_fts),n.id LIMIT ?""", (match, space, now(), limit)).fetchall()
         return [self.note(row) for row in rows]
 
@@ -155,28 +163,24 @@ class Store:
         # ponytail: unpaged; add an after cursor if spaces ever number in the hundreds.
         with self.connect() as db:
             t = now()
-            rows = db.execute("""SELECT space, SUM(n) AS notes, SUM(f) AS facts, SUM(r) AS rules FROM (
-                SELECT space, 1 n, 0 f, 0 r FROM notes WHERE expires_at IS NULL OR expires_at>?
-                UNION ALL SELECT space, 0, 1, 0 FROM facts WHERE expires_at IS NULL OR expires_at>?
+            rows = db.execute(f"""SELECT space, SUM(n) AS notes, SUM(f) AS facts, SUM(r) AS rules FROM (
+                SELECT space, 1 n, 0 f, 0 r FROM notes WHERE {ACTIVE}
+                UNION ALL SELECT space, 0, 1, 0 FROM facts WHERE {ACTIVE}
                 UNION ALL SELECT space, 0, 0, 1 FROM rules
                 ) GROUP BY space ORDER BY space""", (t, t)).fetchall()
         return [dict(row) for row in rows]
 
     def list_notes(self, space, after=None, limit=50):
-        text(space, "space")
+        texts(space=space, after=after)
         limit_value(limit)
-        if after is not None:
-            text(after, "after")
         with self.connect() as db:
-            rows = db.execute("""SELECT id,title,source,updated_at,expires_at FROM notes
-                WHERE space=? AND (expires_at IS NULL OR expires_at>?) AND id>?
+            rows = db.execute(f"""SELECT id,title,source,updated_at,expires_at FROM notes
+                WHERE space=? AND {ACTIVE} AND id>?
                 ORDER BY id LIMIT ?""", (space, now(), after or "", limit)).fetchall()
         return [dict(row) for row in rows]
 
     def put_fact(self, space, id, subject, predicate, object, source, expires_at=None):
-        for name, value in [("space", space), ("id", id), ("subject", subject),
-                            ("predicate", predicate), ("object", object), ("source", source)]:
-            text(value, name)
+        texts(space=space, id=id, subject=subject, predicate=predicate, object=object, source=source)
         with self.connect() as db:
             db.execute("""INSERT INTO facts VALUES(?,?,?,?,?,?,?,?)
                 ON CONFLICT(space,id) DO UPDATE SET subject=excluded.subject,
@@ -186,15 +190,12 @@ class Store:
         return {"id": id, "space": space}
 
     def list_facts(self, space, subject=None, predicate=None, object=None, limit=50, after=None):
-        text(space, "space")
+        texts(space=space, subject=subject, predicate=predicate, object=object, after=after)
         limit_value(limit)
-        clauses = ["space=?", "(expires_at IS NULL OR expires_at>?)", "id>?"]
+        clauses = ["space=?", ACTIVE, "id>?"]
         args = [space, now(), after or ""]
-        if after is not None:
-            text(after, "after")
         for name, value in [("subject", subject), ("predicate", predicate), ("object", object)]:
             if value is not None:
-                text(value, name)
                 clauses.append(f"{name}=?")
                 args.append(value)
         with self.connect() as db:
@@ -203,8 +204,7 @@ class Store:
         return [dict(row) for row in rows]
 
     def put_rule(self, space, id, head, body, source):
-        for name, value in [("space", space), ("id", id), ("source", source)]:
-            text(value, name)
+        texts(space=space, id=id, source=source)
         rule = validate_rule(head, body)
         with self.connect() as db:
             db.execute("""INSERT INTO rules VALUES(?,?,?,?,?) ON CONFLICT(space,id)
@@ -221,24 +221,20 @@ class Store:
     def delete(self, space, kind, id):
         if kind not in {"note", "fact", "rule"}:
             raise ValueError("kind must be note, fact, or rule")
-        text(space, "space")
-        text(id, "id")
+        texts(space=space, id=id)
         with self.connect() as db:
             count = db.execute(f"DELETE FROM {kind}s WHERE space=? AND id=?", (space, id)).rowcount
         return {"deleted": bool(count), "id": id, "space": space, "kind": kind}
 
     def infer(self, space, subject=None, predicate=None, object=None, limit=50):
-        text(space, "space")
+        texts(space=space, subject=subject, predicate=predicate, object=object)
         limit_value(limit)
-        for name, value in [("subject", subject), ("predicate", predicate), ("object", object)]:
-            if value is not None:
-                text(value, name)
         # One read transaction makes the facts/rules a consistent snapshot.
         with self.connect() as db:
             db.execute("BEGIN")
             snapshot_at = now()
-            facts = [dict(row) for row in db.execute("""SELECT * FROM facts WHERE space=?
-                AND (expires_at IS NULL OR expires_at>?) ORDER BY id LIMIT 2001""", (space, snapshot_at))]
+            facts = [dict(row) for row in db.execute(f"""SELECT * FROM facts WHERE space=?
+                AND {ACTIVE} ORDER BY id LIMIT 2001""", (space, snapshot_at))]
             rules = [dict(row) for row in db.execute("SELECT * FROM rules WHERE space=? ORDER BY id LIMIT 33", (space,))]
         if len(facts) > 2000 or len(rules) > 32:
             raise ValueError("inference supports at most 2000 active facts and 32 rules per space")

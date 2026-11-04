@@ -120,6 +120,3 @@ def main():
     path = os.environ.get("CONTEXT_DB", str(Path.cwd() / "context.db"))
     create_server(path).run(transport="stdio")
 
-
-if __name__ == "__main__":
-    main()

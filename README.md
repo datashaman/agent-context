@@ -19,19 +19,11 @@ By default data goes to `context.db` in the process working directory. Set `CONT
 
 ## Connect an MCP client
 
-Use the included `mcp-config.json` in a client that accepts the common `mcpServers` JSON format. Replace the placeholder paths in `command`, `--directory`, and `CONTEXT_DB` with your uv executable, checkout directory, and database location.
+Copy the included [`mcp-config.json`](mcp-config.json) into a client that accepts the common `mcpServers` JSON format, and replace its three placeholder paths:
 
-```json
-{
-  "mcpServers": {
-    "context": {
-      "command": "/absolute/path/to/uv",
-      "args": ["run", "--no-editable", "--locked", "--directory", "/absolute/path/to/context-server", "context-server"],
-      "env": {"CONTEXT_DB": "/absolute/path/to/context.db"}
-    }
-  }
-}
-```
+- `command`: your uv executable (`which uv`)
+- the argument after `--directory`: this checkout
+- `CONTEXT_DB`: where the database should live
 
 The configuration's launch arguments are exercised by an MCP client test using the current checkout and a temporary database. No application settings are changed by this project.
 
@@ -116,7 +108,7 @@ uv run --no-editable --locked pytest -q
 uv build
 ```
 
-Coverage (CI fails below 95%):
+Coverage (CI fails below 100%):
 
 ```sh
 uv run --no-editable --locked coverage run -m pytest -q
