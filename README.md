@@ -9,11 +9,11 @@ This is a small working foundation, not a hosted multi-tenant service. It uses S
 Install [uv](https://docs.astral.sh/uv/), then from this directory:
 
 ```sh
-uv sync --no-editable --locked --python 3.12
+uv sync --no-editable --locked --python 3.13
 uv run --no-editable --locked context-server
 ```
 
-The server speaks MCP over stdin/stdout and waits for a client. It is not an interactive terminal application. Diagnostics go to stderr. Python 3.11+ is supported; tested with Python 3.12.
+The server speaks MCP over stdin/stdout and waits for a client. It is not an interactive terminal application. Diagnostics go to stderr. Python 3.11+ is supported; 3.13 is the recommended version, and CI tests 3.11, 3.12 and 3.13.
 
 By default data goes to `context.db` in the process working directory. Set `CONTEXT_DB` to an absolute path for stable storage across clients and restarts.
 
@@ -122,7 +122,7 @@ uv run --no-editable --locked coverage run -m pytest -q
 uv run --no-editable --locked coverage report
 ```
 
-CI runs the tests with coverage, then the build, on Python 3.11 and 3.12 for every pull request and every push to `main`.
+CI runs the tests with coverage, then the build, on Python 3.11, 3.12 and 3.13 for every pull request and every push to `main`.
 
 Tests cover storage persistence, search-index updates, expiry, source retention, workspace scoping, rule validation, cycles, changed/retracted evidence, hostile strings, domain limits, and a real stdio MCP handshake and tool calls.
 
