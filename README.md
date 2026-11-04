@@ -46,8 +46,9 @@ Tell your agent:
 | `put_note` | Create or replace prose, with source, optional JSON metadata and expiry |
 | `get_note` | Retrieve an active note by stable ID |
 | `search_notes` | Ranked full-text search over active note title/content |
+| `list_notes` | Browse active notes (ID, title, source, timestamps) in ID order, paged with `after` |
 | `put_fact` | Create or replace a sourced subject/predicate/object assertion |
-| `list_facts` | Retrieve active assertions with optional exact filters |
+| `list_facts` | Retrieve active assertions with optional exact filters, in ID order, paged with `after` |
 | `put_rule` | Create or replace a named positive implication |
 | `list_rules` | Inspect all rules in a space |
 | `infer` | Compute asserted and derived triples from a consistent snapshot |
@@ -59,7 +60,7 @@ Every tool requires an explicit `space`. IDs are unique within a space and recor
 
 `expires_at` accepts ISO-8601 with timezone, e.g. `2027-01-01T00:00:00Z`. Expired records remain stored but are hidden from retrieval and inference. Omitting expiry on replacement clears any previous expiry. Retrieval timestamps are UTC.
 
-Search uses literal token matching with OR semantics, ranked by FTS5 BM25; it is not semantic/vector search. `search_notes` and `list_facts` return at most `limit` records (1–100), with no pagination cursor. Use more specific queries/filters for large collections. `infer` includes total match count and a truncation flag.
+Search uses literal token matching with OR semantics, ranked by FTS5 BM25; it is not semantic/vector search. `search_notes`, `list_notes` and `list_facts` return at most `limit` records (1–100). `list_notes` and `list_facts` take a cursor: pass the last returned ID as `after` to get the next page, so an agent can enumerate every note and fact without knowing a keyword. `search_notes` has no cursor. Use more specific queries/filters for large collections. `infer` includes total match count and a truncation flag.
 
 ## Example: dependency context
 
