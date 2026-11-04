@@ -174,6 +174,81 @@ def test_validation_and_truncation(store):
     assert result["truncated"] and result["total_matches"] == 2
 
 
+def test_note_input_checks_and_lookups(store):
+    with pytest.raises(ValueError, match="metadata must be an object"):
+        store.put_note("a", "n", "t", "c", "s", metadata=["not", "a", "dict"])
+    with pytest.raises(ValueError, match="metadata"):
+        store.put_note("a", "n", "t", "c", "s", metadata={"big": "x" * 10_000})
+    with pytest.raises(ValueError):
+        store.put_note("a", "n", "t", "c", "s", metadata={"bad": float("nan")})
+    with pytest.raises(ValueError, match="content"):
+        store.put_note("a", "n", "t", "x" * 100_001, "s")
+    with pytest.raises(ValueError, match="control"):
+        store.put_note("a", "n", "t\x07", "c", "s")
+    with pytest.raises(ValueError, match="timezone"):
+        store.put_note("a", "n", "t", "c", "s", expires_at="2099-01-01T00:00:00")
+    store.put_note("a", "n", "t", "line\nbreak\ttab", "s", expires_at="2099-01-01T02:00:00+02:00")
+    assert store.get_note("a", "n")["expires_at"] == "2099-01-01T00:00:00+00:00"  # normalised to UTC
+    store.put_note("a", "n", "t", "c", "s")
+    assert store.get_note("a", "n")["expires_at"] is None  # replacing without expiry clears it
+    assert store.get_note("a", "missing") is None
+    assert store.search_notes("a", "!!! ???") == []  # no word tokens
+
+
+def test_search_ranks_and_limits(store):
+    store.put_note("a", "weak", "misc", "sqlite once", "s")
+    store.put_note("a", "strong", "sqlite", "sqlite sqlite sqlite", "s")
+    assert [n["id"] for n in store.search_notes("a", "SQLite")] == ["strong", "weak"]
+    assert len(store.search_notes("a", "sqlite", limit=1)) == 1
+
+
+def test_rules_listing_replacement_and_delete_result(store):
+    assert store.list_rules("a") == []
+    transitive(store)
+    store.put_rule("a", "transitive", ["?x", "linked", "?y"], [["?x", "depends", "?y"]], "v2")
+    [rule] = store.list_rules("a")
+    assert rule["source"] == "v2" and rule["definition"]["head"] == ["?x", "linked", "?y"]
+    assert store.delete("a", "rule", "transitive")["deleted"] is True
+    assert store.delete("a", "rule", "transitive")["deleted"] is False  # idempotent
+
+
+def test_fact_filters_combine(store):
+    store.put_fact("a", "1", "x", "p", "y", "s")
+    store.put_fact("a", "2", "x", "q", "y", "s")
+    store.put_fact("a", "3", "z", "p", "y", "s")
+    assert ids(store.list_facts("a", subject="x", predicate="p", object="y")) == ["1"]
+    assert ids(store.list_facts("a", object="y", limit=2)) == ["1", "2"]
+    assert store.infer("a", predicate="q")["facts"][0]["subject"] == "x"
+    with pytest.raises(ValueError, match="subject"):
+        store.infer("a", subject="")
+
+
+def test_infer_space_size_limits(store, monkeypatch):
+    with sqlite3.connect(store.path) as db:
+        db.executemany("INSERT INTO facts VALUES('big',?,?,'p','o','s','t',NULL)",
+                       [(str(i), str(i)) for i in range(2001)])
+        db.executemany("INSERT INTO rules VALUES('many',?,?,'s','t')",
+                       [(str(i), '{"head":["a","b","c"],"body":[["a","b","c"]]}') for i in range(33)])
+    with pytest.raises(ValueError, match="2000 active facts"):
+        store.infer("big")
+    with pytest.raises(ValueError, match="32 rules"):
+        store.infer("many")
+
+
+def test_reasoner_crash_is_reported(store, monkeypatch):
+    failed = subprocess.CompletedProcess([], 1, stdout="", stderr="boom")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: failed)
+    with pytest.raises(ValueError, match="inference failed: boom"):
+        store.infer("a")
+
+
+def test_new_database_is_private_and_reopens(tmp_path):
+    path = tmp_path / "nested" / "dir" / "context.db"
+    Store(path).put_note("a", "n", "t", "c", "s")
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert Store(path).get_note("a", "n")["content"] == "c"  # schema creation is idempotent
+
+
 def test_domain_limit_is_explicit(store):
     for i in range(129):
         store.put_fact("a", str(i), str(i), "p", "b", "s")
